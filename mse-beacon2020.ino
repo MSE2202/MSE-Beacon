@@ -30,21 +30,22 @@
 Tone IR_Output;
 
 
-#define TX_CHAR 0x65 //"U"
+#define TX_CHAR 0x55 //"U"
 #define BLANK_TIME_BETWEEN_CHARACTERS 50000  //50000 = 50mS
 #define BIT_TIME 417
 #define IR_TSOP_FREQUENCY 38000
+
 //#define CONTINUOUS 1
 
 
-#ifndef CONTINUOUS
- #define NUMBER_OF_CHARACTERS_TRANSMITTED 10
- #define BLINK_OUTPUT_TIME_BETWEEN_CHARACTER_GROUP 500  //in milliseconds
-#endif
+#define NUMBER_OF_CHARACTERS_TRANSMITTED 10
+#define BLINK_OUTPUT_TIME_BETWEEN_CHARACTER_GROUP 500  //in milliseconds
+
 
 #define IRLED 12
 
 boolean b_Bit;
+boolean b_Freeze_Transmission;
 unsigned char uc_Bit_Index;
 unsigned char uc_Bit_Time_Counter;
 
@@ -71,7 +72,10 @@ void setup()
   uc_Number_of_Characters = NUMBER_OF_CHARACTERS_TRANSMITTED;
   b_Bit = true;
   uc_Bit_Time_Counter = 0;
-  ui_Blink_Character_Counter = BLINK_OUTPUT_TIME_BETWEEN_CHARACTER_GROUP * 25;
+  ui_Blink_Character_Counter = 0;
+
+   b_Freeze_Transmission = false;
+
    IR_Output.stop();  
 }
 
@@ -85,6 +89,7 @@ void loop()
  {
   
   ul_PreviousTime = micros();
+  ui_Blink_Character_Counter = ui_Blink_Character_Counter + 1;
   uc_Bit_Time_Counter = uc_Bit_Time_Counter + 1;
   if(uc_Bit_Time_Counter >= 10)
   {
@@ -94,18 +99,38 @@ void loop()
     if(uc_Bit_Index >= 16)
     {
       uc_Bit_Index = 0;
-      
+#ifndef CONTINUOUS    
+      if(!b_Freeze_Transmission)
+      {
+        uc_Number_of_Characters = uc_Number_of_Characters - 1;
+        if(uc_Number_of_Characters == 0)
+        {
+         uc_Number_of_Characters = NUMBER_OF_CHARACTERS_TRANSMITTED;
+         b_Freeze_Transmission = true;
+        }
+      }
+#endif      
     }
   }
  }
- if(b_Bit)
+ if(b_Freeze_Transmission)
  {
-  IR_Output.stop();  
+   if(ui_Blink_Character_Counter >= BLINK_OUTPUT_TIME_BETWEEN_CHARACTER_GROUP * 25)
+   {
+    ui_Blink_Character_Counter = 0;
+    b_Freeze_Transmission = false;
+   }
  }
  else
- {  
+ {
+  if(b_Bit)
+  {
+  IR_Output.stop();  
+  }
+  else
+  {  
   IR_Output.play(IR_TSOP_FREQUENCY, 10);
- }
-              
+  }
+ }            
                       
 }

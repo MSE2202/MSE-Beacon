@@ -30,7 +30,7 @@
 Tone IR_Output;
 
 
-#define TX_CHAR 0x55 //"U"
+#define TX_CHAR 0x65 //"U"
 #define BLANK_TIME_BETWEEN_CHARACTERS 50000  //50000 = 50mS
 #define BIT_TIME 417
 #define IR_TSOP_FREQUENCY 38000
@@ -63,14 +63,10 @@ void setup()
   // initialize digital pin LED_BUILTIN as an output.
   IR_Output.begin(IRLED);
 
-  Serial.begin(9600);
-
-  Serial.println("  start  ");
-  
-  //ui_Tranmit_Datum = (TX_CHAR << 8) & 0xFF7F;
-  ui_Tranmit_Datum = 0xFF7F;
-  Serial.println(ui_Tranmit_Datum, BIN);
-  delay(10000);
+  ui_Tranmit_Datum = (TX_CHAR << 8) | 0x007F;
+ Serial.begin(9600);
+ Serial.println(ui_Tranmit_Datum,BIN);
+ Serial.println(ui_Tranmit_Datum,HEX);
   uc_Bit_Index = 0;
   uc_Number_of_Characters = NUMBER_OF_CHARACTERS_TRANSMITTED;
   b_Bit = true;
@@ -95,10 +91,10 @@ void loop()
     uc_Bit_Time_Counter = 0;
     b_Bit = (boolean)((ui_Tranmit_Datum >> uc_Bit_Index) & 0x0001);
     uc_Bit_Index = uc_Bit_Index + 1;
-    if(uc_Bit_Index >= 15)
+    if(uc_Bit_Index >= 16)
     {
       uc_Bit_Index = 0;
-      Serial.println(ui_Tranmit_Datum, BIN);
+      
     }
   }
  }

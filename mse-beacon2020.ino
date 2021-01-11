@@ -4,7 +4,7 @@
   By EJ Porter
 
 
-  beacon wil transmit at 2400 baud the ASCII character "U" (This can be changed at #define")
+  beacon will transmit at 2400 baud the ASCII character "U" (This can be changed at #define")
  
   output at IR LED  of ASCII byte is:
   if byte bit is a 1 ( high) LED is off
@@ -22,7 +22,10 @@
   if continuous mode is needed  #defined CONTINUOUS un-commented
 
   TSOP 32338 IR Receiver pin 1 is output, 2 is Vcc, 3 is Gnd; pin on is on left side when looking at front of part 
+
+  While running red led blinks every 0/5 s
  
+  If the limit switch is pressed the beacon will stop tramsitting for ~ 30 s  ; red led will stop blinking 
 */
 
 #include <Tone.h>
@@ -42,10 +45,16 @@ Tone IR_Output;
 #define BLINK_OUTPUT_TIME_BETWEEN_CHARACTER_GROUP 500  //in milliseconds
 
 
-#define IRLED 12
+#define IRLED 12   
+#define IR_Resistor 11 
+#define LIMITSWITCH_INPUT 6
+#define LIMITSWITCH_OUTPUT 5  
 
 boolean b_Bit;
 boolean b_Freeze_Transmission;
+boolean b_LimitSwitchHit;
+boolean b_ToggleRedLED;
+
 unsigned char uc_Bit_Index;
 unsigned char uc_Bit_Time_Counter;
 
@@ -54,9 +63,12 @@ unsigned char uc_Number_of_Characters;
 unsigned int ui_Blink_Character_Counter;
 unsigned int ui_Tranmit_Datum;
 
+unsigned int ui_ToggleRedLEDCounter;
+
 unsigned long ul_NowTime;
 unsigned long ul_PreviousTime;
 
+unsigned long ul_LimitSwitchTimeOut;
 
 
 void setup() 
@@ -68,6 +80,16 @@ void setup()
  Serial.begin(9600);
  Serial.println(ui_Tranmit_Datum,BIN);
  Serial.println(ui_Tranmit_Datum,HEX);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LIMITSWITCH_INPUT, INPUT_PULLUP);
+  pinMode(LIMITSWITCH_OUTPUT, OUTPUT);
+  pinMode(LIMITSWITCH_INPUT, INPUT_PULLUP);
+  pinMode(11, OUTPUT);
+  digitalWrite(IR_Resistor, LOW); //if you soldered the LED in backwards - change this to HIGH
+  
+  b_LimitSwitchHit = false;
+  
   uc_Bit_Index = 0;
   uc_Number_of_Characters = NUMBER_OF_CHARACTERS_TRANSMITTED;
   b_Bit = true;
@@ -83,13 +105,42 @@ void setup()
 void loop() 
 {
 
-
+ 
  ul_NowTime = micros();
  if(ul_NowTime - ul_PreviousTime >= 40)
  {
-  
   ul_PreviousTime = micros();
-  ui_Blink_Character_Counter = ui_Blink_Character_Counter + 1;
+  if(digitalRead(LIMITSWITCH_INPUT) == 0)
+  {
+    b_LimitSwitchHit = true;
+    b_Freeze_Transmission = true;
+     
+  }
+  
+  if(b_LimitSwitchHit)
+  {
+    b_ToggleRedLED = true;
+    ui_ToggleRedLEDCounter = 0;
+    ul_LimitSwitchTimeOut = ul_LimitSwitchTimeOut + 1;
+    if(ul_LimitSwitchTimeOut >= 750000) //~30s
+    {
+      b_LimitSwitchHit = false;
+      b_Freeze_Transmission = false;
+    }
+  }
+  ui_ToggleRedLEDCounter = ui_ToggleRedLEDCounter + 1;
+  if(ui_ToggleRedLEDCounter >= 6250) //~1/4 sec blink
+  {
+    ui_ToggleRedLEDCounter = 0;
+    b_ToggleRedLED ^= 1;
+    digitalWrite(LED_BUILTIN, b_ToggleRedLED);
+  }
+  
+  
+  if(b_LimitSwitchHit == false)
+  {
+    ui_Blink_Character_Counter = ui_Blink_Character_Counter + 1;
+  }
   uc_Bit_Time_Counter = uc_Bit_Time_Counter + 1;
   if(uc_Bit_Time_Counter >= 10)
   {
@@ -129,7 +180,7 @@ void loop()
   }
   else
   {  
-  IR_Output.play(IR_TSOP_FREQUENCY, 10);
+  IR_Output.play(IR_TSOP_FREQUENCY, 10); //sends 10 cycles of 38Khz
   }
  }            
                       

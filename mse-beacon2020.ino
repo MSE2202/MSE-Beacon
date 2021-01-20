@@ -124,6 +124,7 @@ void loop()
     ul_LimitSwitchTimeOut = ul_LimitSwitchTimeOut + 1;
     if(ul_LimitSwitchTimeOut >= 750000) //~30s
     {
+      ul_LimitSwitchTimeOut = 0;
       b_LimitSwitchHit = false;
       b_Freeze_Transmission = false;
     }

@@ -26,6 +26,10 @@
   While running red led blinks every 0/5 s
  
   If the limit switch is pressed the beacon will stop tramsitting for ~ 30 s  ; red led will stop blinking 
+
+
+
+  
 */
 
 

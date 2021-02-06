@@ -37,6 +37,7 @@
 
 
 #define NUMBER_OF_CHARACTERS_TRANSMITTED 10
+#define FREEZE_COUNT 9000
 
 #define IRLED 12   
 #define IR_Resistor 11 
@@ -254,12 +255,12 @@ void loop()
   //***********************************************************************
 
 
-  //unfeeze after 1500 counts
+  //unfreeze after FREEZE_COUNT counts
   if((!b_LimitSwitchHit) && (vuc_Freeze_Transmission > 0))
   {
    ui_UnFreezeTimer = ui_UnFreezeTimer + 1;
   
-   if(ui_UnFreezeTimer  > 1500)
+   if(ui_UnFreezeTimer  > FREEZE_COUNT)
    {
     
     ui_UnFreezeTimer = 0;

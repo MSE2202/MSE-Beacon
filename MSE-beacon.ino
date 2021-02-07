@@ -29,7 +29,7 @@
 //#define CONTINUOUS 1  // uncomment for continuous transmission of character
 
 #define NUMBER_OF_CHARACTERS_TRANSMITTED 10
-#define FREEZE_COUNT 8500  // ~400 ms
+#define FREEZE_COUNT 3188 // ~150 ms; 2125 ~= 100 ms
 
 #define IRLED 12 //if you soldered the IR LED in backwards, change this to 11
 #define IR_RESISTOR 11 //if you soldered the IR LED in backwards, change this to 12

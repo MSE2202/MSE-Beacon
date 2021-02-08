@@ -43,6 +43,8 @@
 boolean b_LimitSwitchHit;
 boolean b_ToggleRedLED;
 
+volatile int8_t vi8TXdata;
+
 volatile int8_t v8_TooogleBit;
  
 volatile unsigned char vuc_Freeze_Transmission;
@@ -60,9 +62,9 @@ unsigned long ul_LimitSwitchTimeOut;
 
 void setup() 
 {
+  vi8TXdata = DATUM_TO_TX1;
   vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
   vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
-  vuc_Datum_High = DATUM_TO_TX1;
   vuc_CarryBit = 0x01;
   
   Serial.begin(115200);
@@ -138,17 +140,16 @@ ISR(TIMER1_COMPA_vect,ISR_NOBLOCK)
      "1:                 \n" 
      "ldi %1, 0x00       \n" //store carry and carry is low so turn on 38Khz to LED
      "100:               \n" 
-     "lds __tmp_reg__, %4\n"
-     "cp %B0, __tmp_reg__\n" //check  vui_Tranmit_Datum high byte is it 0x55 ( mihgt neeed to change it if you change Tx character
+     "cp %B0, %4         \n" //check  vui_Tranmit_Datum high byte is charater to transmit ( might need to change it if you change Tx character
      "brne 110f          \n"
-     "cpi %A0, %5        \n" //check  vui_Tranmit_Datum high byte is it 0x55 ( mihgt neeed to change it if you change Tx character
+     "cpi %A0, %5        \n" //check  vui_Tranmit_Datum low byte is 0x7f startbit in UART communications
      "brne 110f          \n"
      "inc %2             \n"  //count the number of times the character was Transmitted
      "ldi %3, 0xFF       \n" //ack a charater has gone out
      "sbi %6, %7         \n" //D8
      "110:               \n" 
      :"+r" (vui_Tranmit_Datum),"+r" (vuc_CarryBit),"+r" (vuc_Number_of_Characters),"+r" (vuc_ACKTx)
-     :"m" (vuc_Datum_High),"M" (DATUM_BLANK),"I" (_SFR_IO_ADDR(PORTB)), "I" (PORTB0)
+     :"r" (vi8TXdata),"M" (DATUM_BLANK),"I" (_SFR_IO_ADDR(PORTB)), "I" (PORTB0)
   );
 }
 
@@ -198,20 +199,11 @@ void loop()
     }
     if(b_LimitSwitchHit)
     { 
-      if(ul_LimitSwitchTimeOut == 0) {
-        vui_Tranmit_Datum = DATUM_TO_TX2;   //set up data to transmit
-        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;       
-        vuc_Datum_High = DATUM_TO_TX2;
-      }
       ul_LimitSwitchTimeOut = ul_LimitSwitchTimeOut + 1;
       if(ul_LimitSwitchTimeOut >= 250000) // ~10 sec
       {
-        vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
-        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;  
-        vuc_Datum_High = DATUM_TO_TX1;
         ul_LimitSwitchTimeOut = 0;
         b_LimitSwitchHit = false;
-        ui_UnFreezeTimer = 1200;
       }
     }
     ui_ToggleRedLEDCounter = ui_ToggleRedLEDCounter + 1;
@@ -240,6 +232,18 @@ void loop()
 #ifndef CONTINUOUS    
     if((vuc_ACKTx > 0) && (vuc_Freeze_Transmission == 0))
     {
+      if(b_LimitSwitchHit)
+      {
+        vi8TXdata = DATUM_TO_TX2;
+        vui_Tranmit_Datum = DATUM_TO_TX2;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
+      }
+      else
+      {
+        vi8TXdata = DATUM_TO_TX1;
+        vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
+      }
       if(vuc_Number_of_Characters >= NUMBER_OF_CHARACTERS_TRANSMITTED)
       {
         vuc_Number_of_Characters = 0;
@@ -253,6 +257,18 @@ void loop()
 #else   
     if((vuc_ACKTx >= 1))
     {
+      if(b_LimitSwitchHit)
+      {
+        vi8TXdata = DATUM_TO_TX2;
+        vui_Tranmit_Datum = DATUM_TO_TX2;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
+      }
+      else
+      {
+        vi8TXdata = DATUM_TO_TX1;
+        vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
+      }
       vuc_Freeze_Transmission = 0x0;
       vuc_ACKTx = 0;
       vuc_Number_of_Characters = 0;

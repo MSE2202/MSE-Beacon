@@ -37,7 +37,8 @@
 #define LIMITSWITCH_OUTPUT 5  
 
 #define DATUM_BLANK 0x7F
-#define DATUM_TO_TX 0x55  // Tx an "U" (0x55) and then blank for one character 
+#define DATUM_TO_TX1 0x55  // Tx an "U" (0x55) and then blank for one character 
+#define DATUM_TO_TX2 0x41  // Tx an "A" (0x41) and then blank for one character 
 
 boolean b_LimitSwitchHit;
 boolean b_ToggleRedLED;
@@ -49,6 +50,7 @@ volatile unsigned char vuc_Number_of_Characters;
 volatile unsigned char vuc_ACKTx;
 volatile unsigned char vuc_CarryBit;
 volatile unsigned int vui_Tranmit_Datum;
+volatile unsigned char vuc_Datum_High;
 
 unsigned int ui_UnFreezeTimer;
 unsigned int ui_ToggleRedLEDCounter;
@@ -58,8 +60,9 @@ unsigned long ul_LimitSwitchTimeOut;
 
 void setup() 
 {
-  vui_Tranmit_Datum = DATUM_TO_TX;   //set up data to transmit
+  vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
   vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;
+  vuc_Datum_High = DATUM_TO_TX1;
   vuc_CarryBit = 0x01;
   
   Serial.begin(115200);
@@ -71,7 +74,6 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LIMITSWITCH_INPUT, INPUT_PULLUP);
   pinMode(LIMITSWITCH_OUTPUT, OUTPUT);
-  pinMode(LIMITSWITCH_INPUT, INPUT_PULLUP);
   pinMode(IR_RESISTOR, OUTPUT);
   pinMode(IRLED, OUTPUT);
   
@@ -136,7 +138,8 @@ ISR(TIMER1_COMPA_vect,ISR_NOBLOCK)
      "1:                 \n" 
      "ldi %1, 0x00       \n" //store carry and carry is low so turn on 38Khz to LED
      "100:               \n" 
-     "cpi %B0, %4        \n" //check  vui_Tranmit_Datum high byte is it 0x55 ( mihgt neeed to change it if you change Tx character
+     "lds __tmp_reg__, %4\n"
+     "cp %B0, __tmp_reg__\n" //check  vui_Tranmit_Datum high byte is it 0x55 ( mihgt neeed to change it if you change Tx character
      "brne 110f          \n"
      "cpi %A0, %5        \n" //check  vui_Tranmit_Datum high byte is it 0x55 ( mihgt neeed to change it if you change Tx character
      "brne 110f          \n"
@@ -145,7 +148,7 @@ ISR(TIMER1_COMPA_vect,ISR_NOBLOCK)
      "sbi %6, %7         \n" //D8
      "110:               \n" 
      :"+r" (vui_Tranmit_Datum),"+r" (vuc_CarryBit),"+r" (vuc_Number_of_Characters),"+r" (vuc_ACKTx)
-     :"M" (DATUM_TO_TX),"M" (DATUM_BLANK),"I" (_SFR_IO_ADDR(PORTB)), "I" (PORTB0)
+     :"m" (vuc_Datum_High),"M" (DATUM_BLANK),"I" (_SFR_IO_ADDR(PORTB)), "I" (PORTB0)
   );
 }
 
@@ -194,19 +197,25 @@ void loop()
       b_LimitSwitchHit = true; 
     }
     if(b_LimitSwitchHit)
-    {
-      b_ToggleRedLED = true;
-      ui_ToggleRedLEDCounter = 0;
+    { 
+      if(ul_LimitSwitchTimeOut == 0) {
+        vui_Tranmit_Datum = DATUM_TO_TX2;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;       
+        vuc_Datum_High = DATUM_TO_TX2;
+      }
       ul_LimitSwitchTimeOut = ul_LimitSwitchTimeOut + 1;
-      if(ul_LimitSwitchTimeOut >= 750000) // ~30 sec
+      if(ul_LimitSwitchTimeOut >= 250000) // ~10 sec
       {
+        vui_Tranmit_Datum = DATUM_TO_TX1;   //set up data to transmit
+        vui_Tranmit_Datum = (vui_Tranmit_Datum << 8) + DATUM_BLANK;  
+        vuc_Datum_High = DATUM_TO_TX1;
         ul_LimitSwitchTimeOut = 0;
         b_LimitSwitchHit = false;
         ui_UnFreezeTimer = 1200;
       }
     }
     ui_ToggleRedLEDCounter = ui_ToggleRedLEDCounter + 1;
-    if(ui_ToggleRedLEDCounter >= 6250) // ~1/4 sec blink
+    if((ui_ToggleRedLEDCounter >= 6250) || (ui_ToggleRedLEDCounter >= 1560 && b_LimitSwitchHit)) // ~1/4 sec blink; ~1/16 sec when hit
     {
       ui_ToggleRedLEDCounter = 0;
       b_ToggleRedLED ^= 1;
@@ -217,7 +226,7 @@ void loop()
     //***********************************************************************
   
     //unfreeze after FREEZE_COUNT counts
-    if((!b_LimitSwitchHit) && (vuc_Freeze_Transmission > 0))
+    if(vuc_Freeze_Transmission > 0)
     {
       ui_UnFreezeTimer = ui_UnFreezeTimer + 1;
       if(ui_UnFreezeTimer  > FREEZE_COUNT)
@@ -225,36 +234,29 @@ void loop()
         ui_UnFreezeTimer = 0;
         vuc_Freeze_Transmission = 0;
       }
-    }  
+    }
     //Tx NUMBER_OF_CHARACTERS_TRANSMITTED stop Txing the same number of characters, rinse repeat
   
 #ifndef CONTINUOUS    
     if((vuc_ACKTx > 0) && (vuc_Freeze_Transmission == 0))
     {
-      if((vuc_Number_of_Characters >= NUMBER_OF_CHARACTERS_TRANSMITTED) ||(b_LimitSwitchHit))
+      if(vuc_Number_of_Characters >= NUMBER_OF_CHARACTERS_TRANSMITTED)
       {
         vuc_Number_of_Characters = 0;
         vuc_Freeze_Transmission = 0xFF;
       }
       else
       {
-        vuc_ACKTx = 0;
+         vuc_ACKTx = 0;
       }
     }
 #else   
     if((vuc_ACKTx >= 1))
     {
-      if(b_LimitSwitchHit)
-      {
-        vuc_Freeze_Transmission = 0xFF;
-      }
-      else
-      {
-        vuc_Freeze_Transmission = 0x0;
-        vuc_ACKTx = 0;
-      }
+      vuc_Freeze_Transmission = 0x0;
+      vuc_ACKTx = 0;
       vuc_Number_of_Characters = 0;
     }
-#endif    
-  }
+#endif
+  } 
 }
